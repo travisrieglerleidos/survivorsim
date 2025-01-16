@@ -145,7 +145,6 @@ public class Main {
     }
 
     private void execute() {
-        System.out.println("Hello world!");
         
         Experiment.builder()//
             .addPlugin(getPeoplePlugin())//
