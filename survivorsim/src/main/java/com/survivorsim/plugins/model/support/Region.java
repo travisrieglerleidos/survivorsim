@@ -1,4 +1,4 @@
-package com.survivorsim.plugins.model;
+package com.survivorsim.plugins.model.support;
 
 import net.jcip.annotations.Immutable;
 import gov.hhs.aspr.ms.gcm.simulation.plugins.regions.support.RegionId;
