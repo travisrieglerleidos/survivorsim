@@ -6,10 +6,10 @@ import java.util.Random;
 
 import org.apache.commons.math3.random.RandomGenerator;
 
-import com.survivorsim.plugins.model.GlobalProperty;
-import com.survivorsim.plugins.model.GroupProperty;
-import com.survivorsim.plugins.model.GroupType;
-import com.survivorsim.plugins.model.PersonProperty;
+import com.survivorsim.plugins.model.support.GlobalProperty;
+import com.survivorsim.plugins.model.support.GroupProperty;
+import com.survivorsim.plugins.model.support.GroupType;
+import com.survivorsim.plugins.model.support.PersonProperty;
 
 import gov.hhs.aspr.ms.gcm.simulation.nucleus.ActorContext;
 import gov.hhs.aspr.ms.gcm.simulation.plugins.globalproperties.datamanagers.GlobalPropertiesDataManager;

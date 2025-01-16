@@ -2,13 +2,13 @@ package com.survivorsim;
 
 import org.apache.commons.math3.random.RandomGenerator;
 
-import com.survivorsim.plugins.model.GlobalProperty;
-import com.survivorsim.plugins.model.GroupProperty;
-import com.survivorsim.plugins.model.GroupType;
 import com.survivorsim.plugins.model.ModelPlugin;
-import com.survivorsim.plugins.model.PersonProperty;
-import com.survivorsim.plugins.model.Region;
 import com.survivorsim.plugins.model.reports.OutputConsumer;
+import com.survivorsim.plugins.model.support.GlobalProperty;
+import com.survivorsim.plugins.model.support.GroupProperty;
+import com.survivorsim.plugins.model.support.GroupType;
+import com.survivorsim.plugins.model.support.PersonProperty;
+import com.survivorsim.plugins.model.support.Region;
 
 import gov.hhs.aspr.ms.gcm.simulation.nucleus.Experiment;
 import gov.hhs.aspr.ms.gcm.simulation.nucleus.Plugin;

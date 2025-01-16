@@ -1,4 +1,4 @@
-package com.survivorsim.plugins.model;
+package com.survivorsim.plugins.model.support;
 
 import gov.hhs.aspr.ms.gcm.simulation.plugins.groups.support.GroupPropertyId;
 
