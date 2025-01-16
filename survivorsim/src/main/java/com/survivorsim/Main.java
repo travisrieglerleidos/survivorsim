@@ -32,17 +32,12 @@ public class Main {
 
     private RandomGenerator randomGenerator = RandomGeneratorProvider.getRandomGenerator(9032703880551658180L);
 
-    private Plugin getPeoplePlugin(){
-        PeoplePluginData peoplePluginData = PeoplePluginData.builder().build();
-        return PeoplePlugin.getPeoplePlugin(peoplePluginData);
-    }
-
     private Plugin getGlobalPropertiesPlugin() {
 
         // Create Plugin DATA Builder
         GlobalPropertiesPluginData.Builder builder = GlobalPropertiesPluginData.builder();
 
-        // Define a property
+        // Define the number of players per tribe
         PropertyDefinition propertyDefinition = PropertyDefinition.builder()//
             .setType(Integer.class)//
             .setDefaultValue(6)//
@@ -51,7 +46,7 @@ public class Main {
 
         builder.defineGlobalProperty(GlobalProperty.PLAYERS_PER_TRIBE, propertyDefinition, 0);
 
-        // Define a second property
+        // Define the number of tribes
         propertyDefinition = PropertyDefinition.builder()//
             .setType(Integer.class)//
             .setDefaultValue(3)//
@@ -60,12 +55,12 @@ public class Main {
 
         builder.defineGlobalProperty(GlobalProperty.NUMBER_OF_TRIBES, propertyDefinition, 0);
 
-        // Define a third property
+        // Define a boolean property to signify if the tribes have merged yet
         propertyDefinition = PropertyDefinition.builder()//
-                .setType(Boolean.class)//
-                .setDefaultValue(false)//
-                .setPropertyValueMutability(true)//
-                .build();
+            .setType(Boolean.class)//
+            .setDefaultValue(false)//
+            .setPropertyValueMutability(true)//
+            .build();
     
         builder.defineGlobalProperty(GlobalProperty.MERGED, propertyDefinition, 0);
 
@@ -73,24 +68,45 @@ public class Main {
         GlobalPropertiesPluginData globalPropertiesPluginData = builder.build();
 
         // Create and return the final Plugin
-        return GlobalPropertiesPlugin.builder()
-            .setGlobalPropertiesPluginData(globalPropertiesPluginData)
+        return GlobalPropertiesPlugin.builder()//
+            .setGlobalPropertiesPluginData(globalPropertiesPluginData)//
             .getGlobalPropertiesPlugin();
 
+    }
+
+    private Plugin getStochasticsPlugin() {
+        WellState wellState = WellState.builder().setSeed(randomGenerator.nextLong()).build();
+		StochasticsPluginData stochasticsPluginData = StochasticsPluginData.builder()//
+			.setMainRNGState(wellState)//
+			.build();
+
+		return StochasticsPlugin.getStochasticsPlugin(stochasticsPluginData);
+    }
+
+    private Plugin getRegionsPlugin() {
+        RegionsPluginData.Builder regionsPluginDataBuilder = RegionsPluginData.builder();
+
+        regionsPluginDataBuilder.addRegion(new Region(0));
+		
+		RegionsPluginData regionsPluginData = regionsPluginDataBuilder.build();
+
+		return RegionsPlugin.builder()//
+            .setRegionsPluginData(regionsPluginData)//
+            .getRegionsPlugin();
     }
 
     private Plugin getGroupsPlugin() {
         
         GroupsPluginData.Builder builder = GroupsPluginData.builder();
 
-        PropertyDefinition propertyDefinition = PropertyDefinition.builder()//
-            .setType(Boolean.class)//
-            .setDefaultValue(true)//
-            .build();
-
         for (GroupType groupType : GroupType.values()) {
             builder.addGroupTypeId(groupType);
         }
+
+        PropertyDefinition propertyDefinition = PropertyDefinition.builder()//
+            .setType(Boolean.class)//
+            .setDefaultValue(false)//
+            .build();
 
         builder.defineGroupProperty(GroupType.TRIBE, GroupProperty.IS_IMMUNE, propertyDefinition);
 
@@ -102,15 +118,10 @@ public class Main {
 
     }
 
-    private Plugin getStochasticsPlugin() {
-        
-        WellState wellState = WellState.builder().setSeed(randomGenerator.nextLong()).build();
-		StochasticsPluginData stochasticsPluginData = StochasticsPluginData.builder()//
-			.setMainRNGState(wellState)//
-			.build();
 
-		return StochasticsPlugin.getStochasticsPlugin(stochasticsPluginData);
-
+    private Plugin getPeoplePlugin(){
+        PeoplePluginData peoplePluginData = PeoplePluginData.builder().build();
+        return PeoplePlugin.getPeoplePlugin(peoplePluginData);
     }
 
     private Plugin getPersonPropertiesPlugin() {
@@ -132,31 +143,18 @@ public class Main {
 
     }
 
-    private Plugin getRegionsPlugin() {
-        RegionsPluginData.Builder regionsPluginDataBuilder = RegionsPluginData.builder();
-
-        regionsPluginDataBuilder.addRegion(new Region(0));
-		
-		RegionsPluginData regionsPluginData = regionsPluginDataBuilder.build();
-
-		return RegionsPlugin.builder()//
-            .setRegionsPluginData(regionsPluginData)//
-            .getRegionsPlugin();
-    }
-
     private void execute() {
-        
         Experiment.builder()//
-            .addPlugin(getPeoplePlugin())//
-            .addPlugin(getRegionsPlugin())//
-            .addPlugin(getPersonPropertiesPlugin())//
-            .addPlugin(getGroupsPlugin())//
             .addPlugin(getGlobalPropertiesPlugin())//
-            .addPlugin(getStochasticsPlugin())
+            .addPlugin(getStochasticsPlugin())//
+            .addPlugin(getRegionsPlugin())//
+            .addPlugin(getGroupsPlugin())//
+            .addPlugin(getPeoplePlugin())//
+            .addPlugin(getPersonPropertiesPlugin())//
             .addPlugin(ModelPlugin.getModePlugin())//
             .addExperimentContextConsumer(new OutputConsumer())//
             .build()//
-            .execute();//
+            .execute();
     }
 
     public static void main(String[] args) {
