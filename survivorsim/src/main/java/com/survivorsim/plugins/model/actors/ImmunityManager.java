@@ -33,18 +33,18 @@ public class ImmunityManager {
     public void init(ActorContext actorContext) {
 
         this.actorContext = actorContext;
+
+        // Grab various data managers
         groupsDataManager = actorContext.getDataManager(GroupsDataManager.class);
         globalPropertiesDataManager = actorContext.getDataManager(GlobalPropertiesDataManager.class);
         personPropertiesDataManager = actorContext.getDataManager(PersonPropertiesDataManager.class);
-        
         StochasticsDataManager stochasticsDataManager = actorContext.getDataManager(StochasticsDataManager.class);
 		randomGenerator = stochasticsDataManager.getRandomGenerator();
 
+        //Subscribe to event which states that the tribes have merged
         actorContext.subscribe(globalPropertiesDataManager.getEventFilterForGlobalPropertyUpdateEvent(GlobalProperty.MERGED), this::handleMergedUpdateEvent);
-
-        double planTime = actorContext.getTime() + 2;
-        System.out.println("-----------------Scheduling next immunity challenge for time: " + planTime);
-        actorContext.addPlan(((c) -> awardImmunity()), planTime);
+    
+        actorContext.addPlan(((c) -> awardImmunity()), actorContext.getTime() + 2);
 
     }
 
@@ -53,8 +53,8 @@ public class ImmunityManager {
     }
 
     public void awardImmunity() {
-        System.out.println();
-        System.out.println("Entered immunity...");
+
+        actorContext.releaseOutput("The immunity challenge is beginning!");
 
         if (!merged) {
             awardTribalImmunity();
@@ -66,52 +66,56 @@ public class ImmunityManager {
             return;
         }
 
-        double planTime = actorContext.getTime() + 2;
-        System.out.println("-----------------Scheduling next immunity challenge for time: " + planTime);
-        actorContext.addPlan(((c) -> awardImmunity()), planTime);
+        actorContext.addPlan(((c) -> awardImmunity()), actorContext.getTime() + 2);
         
     }
 
     private void awardTribalImmunity() {
+        /*
+         * Technically, all tribes start the challenge without immunity and then every tribe
+         * but the losing tribe gains immunity back. 
+         * 
+         * But it is more efficient to make every tribe immune
+         * and then select 1 tribe to lose immunity.
+         */
 
-        System.out.println("its a tribal immunity challenge!");
-        //remove immunity from all tribes
+        // Add immunity to all tribes
         List<GroupId> tribeGroupIds = groupsDataManager.getGroupsForGroupType(GroupType.TRIBE);
 
         for (GroupId groupId : tribeGroupIds) {
-            groupsDataManager.setGroupPropertyValue(groupId, GroupProperty.IS_IMMUNE, false);
+            groupsDataManager.setGroupPropertyValue(groupId, GroupProperty.IS_IMMUNE, true);
         }
                 
-        Random random = new Random(randomGenerator.nextLong());
-        Collections.shuffle(tribeGroupIds, random);
-        
-        groupsDataManager.setGroupPropertyValue(tribeGroupIds.get(0), GroupProperty.IS_IMMUNE, true);
-        groupsDataManager.setGroupPropertyValue(tribeGroupIds.get(1), GroupProperty.IS_IMMUNE, true);
-
+        int indexOfTribeLosingImmunity = randomGenerator.nextInt(tribeGroupIds.size());
+        GroupId tribeLosingImmunity = tribeGroupIds.get(indexOfTribeLosingImmunity);
+        actorContext.releaseOutput("Tribe " + tribeLosingImmunity + " lost immunity!");
+        groupsDataManager.setGroupPropertyValue(tribeLosingImmunity, GroupProperty.IS_IMMUNE, false);
+  
     }
 
     private void awardIndividualImmunity() {
+ 
+        // Remove immunity from all players
+        List<PersonId> playerIds = groupsDataManager.getPeopleForGroupType(GroupType.MERGED_TRIBE);
 
-        System.out.println("its an individual immunity challenge!");
-        //remove immunity from all people
-        List<PersonId> peopleForGroupType = groupsDataManager.getPeopleForGroupType(GroupType.MERGED_TRIBE);
-        int peopleLeft = peopleForGroupType.size();
-
-        if (peopleLeft <= 2) {
+        /*
+         * If we have 2 players remaining, then this is the last immunity that we need to award. 
+         * In that case, we do not want to plan another immunity
+         */
+        int playersLeft = playerIds.size();
+        if (playersLeft <= 2) {
             gameOver = true;
         }
 
-        for (PersonId personId : peopleForGroupType) {
-            personPropertiesDataManager.setPersonPropertyValue(personId, PersonProperty.IS_IMMUNE, false);
+        for (PersonId playerId : playerIds) {
+            personPropertiesDataManager.setPersonPropertyValue(playerId, PersonProperty.IS_IMMUNE, false);
         }
 
-        Random random = new Random(randomGenerator.nextLong());
-        Collections.shuffle(peopleForGroupType, random);
-
-        System.out.println();
-        System.out.println("Player " + peopleForGroupType.get(0) + " won immunity!");
-
-        personPropertiesDataManager.setPersonPropertyValue(peopleForGroupType.get(0), PersonProperty.IS_IMMUNE, true);
+        // Select a player to award immunity to
+        int indexOfPlayerWinningImmunity = randomGenerator.nextInt(playersLeft);
+        PersonId playerWinningImmunity = playerIds.get(indexOfPlayerWinningImmunity);
+        actorContext.releaseOutput("Player " + playerWinningImmunity + " won immunity!");
+        personPropertiesDataManager.setPersonPropertyValue(playerWinningImmunity, PersonProperty.IS_IMMUNE, true);
 
     }
 
