@@ -1,6 +1,7 @@
 package com.survivorsim.plugins.model.actors;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 
@@ -85,13 +86,28 @@ public class VotingManager {
         boolean shouldMergeAfterVote = playerIdsInTribe.size() <= 4;
 
         // Select 1 player to vote off
-        int indexOfPlayerVotedOff = randomGenerator.nextInt(playerIdsInTribe.size());
-        PersonId playerIdVotedOff = playerIdsInTribe.get(indexOfPlayerVotedOff);
+        Comparator<PersonId> comparingInt = Comparator.comparingInt((PersonId playerId) -> {
+            return personPropertiesDataManager.getPersonPropertyValue(playerId, PersonProperty.THREAT_LEVEL);
+        }).reversed();
 
-        GroupId newGroupId = groupsDataManager.getGroupsForGroupType(GroupType.SENT_HOME).get(0);
-        transferPlayerToNewGroup(playerIdVotedOff, tribeGroupId, newGroupId);
+        playerIdsInTribe.sort(comparingInt);
+
+        PersonId playerIdVotedOff = null;
+
+        for (PersonId playerId : playerIdsInTribe) {
+            if (randomGenerator.nextInt(100) < 33) {
+                playerIdVotedOff = playerId;
+                break;
+            }
+        }
+
+        if (playerIdVotedOff == null) {
+            playerIdVotedOff = playerIdsInTribe.get(playerIdsInTribe.size() - 1);
+        }
 
         actorContext.releaseOutput("Player " + playerIdVotedOff + " from tribe " + tribeGroupId + " was voted off!");
+        GroupId newGroupId = groupsDataManager.getGroupsForGroupType(GroupType.SENT_HOME).get(0);
+        transferPlayerToNewGroup(playerIdVotedOff, tribeGroupId, newGroupId);
 
         // Report the status of each group after the vote:
         Set<GroupTypeId> groupTypeIds = groupsDataManager.getGroupTypeIds();
@@ -147,8 +163,25 @@ public class VotingManager {
         actorContext.releaseOutput("playersNotSafe has this many members: " + playersNotSafe.size());
 
         // Select 1 player to vote off
-        int indexOfPlayerVotedOff = randomGenerator.nextInt(playersNotSafe.size());
-        PersonId playerIdVotedOff = playersNotSafe.get(indexOfPlayerVotedOff);
+        Comparator<PersonId> comparingInt = Comparator.comparingInt((PersonId playerId) -> {
+            return personPropertiesDataManager.getPersonPropertyValue(playerId, PersonProperty.THREAT_LEVEL);
+        }).reversed();
+
+        playersNotSafe.sort(comparingInt);
+
+        PersonId playerIdVotedOff = null;
+
+        for (PersonId playerId : playersNotSafe) {
+            if (randomGenerator.nextInt(100) < 33) {
+                playerIdVotedOff = playerId;
+                break;
+            }
+        }
+
+        if (playerIdVotedOff == null) {
+            playerIdVotedOff = playersNotSafe.get(playersNotSafe.size() - 1);
+        }
+
         actorContext.releaseOutput("Oh No! Player " + playerIdVotedOff + " was voted off!!");
 
         // Move the voted off player from the merged tribe to the jury
