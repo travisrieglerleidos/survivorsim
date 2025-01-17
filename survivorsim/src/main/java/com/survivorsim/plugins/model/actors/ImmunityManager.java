@@ -1,5 +1,8 @@
 package com.survivorsim.plugins.model.actors;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 import org.apache.commons.math3.random.RandomGenerator;
@@ -109,11 +112,43 @@ public class ImmunityManager {
             personPropertiesDataManager.setPersonPropertyValue(playerId, PersonProperty.IS_IMMUNE, false);
         }
 
-        // Select a player to award immunity to
-        int indexOfPlayerWinningImmunity = randomGenerator.nextInt(playersLeft);
-        PersonId playerWinningImmunity = playerIds.get(indexOfPlayerWinningImmunity);
+
+        /*
+         * Select a player to award immunity to
+         * We first sort the players based on the sum of their challenge stats (endurance, puzzle solving, physicality)
+         * Then starting with the player with the best stats, we give them a 33% of winning.
+         * If they do not win, we move to the player with the second best stats and give them a 25% chance of winning
+         * If after going through all the players, no one has won, then we award immunity to the last player
+         */
+        Comparator<PersonId> comparingInt = Comparator.comparingInt((PersonId playerId) -> {
+            int endurance = personPropertiesDataManager.getPersonPropertyValue(playerId, PersonProperty.ENDURANCE);
+            int puzzleSolving = personPropertiesDataManager.getPersonPropertyValue(playerId, PersonProperty.PUZZLE_SOLVING);
+            int physicality = personPropertiesDataManager.getPersonPropertyValue(playerId, PersonProperty.PHYSICALITY);
+            return endurance + puzzleSolving + physicality;
+        }).reversed();
+
+        playerIds.sort(comparingInt);
+
+        PersonId playerWinningImmunity = null;
+
+        for (PersonId playerId : playerIds) {
+            if (randomGenerator.nextInt(100) < 33) {
+                playerWinningImmunity = playerId;
+                break;
+            }
+        }
+
+        if (playerWinningImmunity == null) {
+            playerWinningImmunity = playerIds.get(playerIds.size() - 1);
+        }
+   
         actorContext.releaseOutput("Player " + playerWinningImmunity + " won immunity!");
         personPropertiesDataManager.setPersonPropertyValue(playerWinningImmunity, PersonProperty.IS_IMMUNE, true);
+
+        // Increase winning player's threat level
+        int oldThreatLevel = personPropertiesDataManager.getPersonPropertyValue(playerWinningImmunity, PersonProperty.THREAT_LEVEL);
+        int newThreatLevel = oldThreatLevel + 1;
+        personPropertiesDataManager.setPersonPropertyValue(playerWinningImmunity, PersonProperty.THREAT_LEVEL, newThreatLevel);
 
     }
 
