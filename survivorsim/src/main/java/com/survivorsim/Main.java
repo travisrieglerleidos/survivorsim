@@ -128,12 +128,26 @@ public class Main {
 
         PersonPropertiesPluginData.Builder builder = PersonPropertiesPluginData.builder();
 
+        // Set player immunity status
         PropertyDefinition propertyDefinition = PropertyDefinition.builder()//
             .setType(Boolean.class)//
             .setDefaultValue(false)//
             .build();
 
         builder.definePersonProperty(PersonProperty.IS_IMMUNE, propertyDefinition, 0, false);
+
+         //Set player stats
+        propertyDefinition = PropertyDefinition.builder()//
+            .setType(Integer.class)//
+            .setDefaultValue(0)//
+            .build();
+
+        builder.definePersonProperty(PersonProperty.ENDURANCE, propertyDefinition, 0, false);
+        builder.definePersonProperty(PersonProperty.PUZZLE_SOLVING, propertyDefinition, 0, false);
+        builder.definePersonProperty(PersonProperty.PHYSICALITY, propertyDefinition, 0, false);
+        builder.definePersonProperty(PersonProperty.SOCIAL_SKILLS, propertyDefinition, 0, false);
+        builder.definePersonProperty(PersonProperty.INTELLECT, propertyDefinition, 0, false);
+        builder.definePersonProperty(PersonProperty.THREAT_LEVEL, propertyDefinition, 0, false);
 
         PersonPropertiesPluginData personPropertiesPluginData = builder.build();
 
