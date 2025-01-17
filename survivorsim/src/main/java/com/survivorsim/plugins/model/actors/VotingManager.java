@@ -1,9 +1,7 @@
 package com.survivorsim.plugins.model.actors;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
-import java.util.Random;
 import java.util.Set;
 
 import org.apache.commons.math3.random.RandomGenerator;
@@ -33,148 +31,141 @@ public class VotingManager {
     private boolean gameOver = false;
 
     public void init(ActorContext actorContext) {
-        this.actorContext = actorContext;
-        this.groupsDataManager = actorContext.getDataManager(GroupsDataManager.class);
-        this.globalPropertiesDataManager = actorContext.getDataManager(GlobalPropertiesDataManager.class);
-        this.personPropertiesDataManager = actorContext.getDataManager(PersonPropertiesDataManager.class);
-        StochasticsDataManager stochasticsDataManager = actorContext.getDataManager(StochasticsDataManager.class);
-		this.randomGenerator = stochasticsDataManager.getRandomGenerator();
 
-        double planTime = actorContext.getTime() + 2.1;
-        System.out.println("-----------------planning the next vote for time: " + planTime);
-        actorContext.addPlan(((c) -> voteOffPlayer()), planTime);
+        this.actorContext = actorContext;
+
+        // Grab various data managers
+        groupsDataManager = actorContext.getDataManager(GroupsDataManager.class);
+        globalPropertiesDataManager = actorContext.getDataManager(GlobalPropertiesDataManager.class);
+        personPropertiesDataManager = actorContext.getDataManager(PersonPropertiesDataManager.class);
+        StochasticsDataManager stochasticsDataManager = actorContext.getDataManager(StochasticsDataManager.class);
+		randomGenerator = stochasticsDataManager.getRandomGenerator();
+
+        actorContext.addPlan(((c) -> voteOffPlayer()), actorContext.getTime() + 2.1);
 
     }
 
     private void voteOffPlayer() {
-        // Start unnecessary section
-        System.out.println("about to start voting off a player!");
+        actorContext.releaseOutput("The vote is about to begin!");
 
-        Set<GroupTypeId> groupTypeIds = groupsDataManager.getGroupTypeIds();
-
-        for (GroupTypeId groupTypeId : groupTypeIds) {
-
-            List<GroupId> groupsForGroupType = groupsDataManager.getGroupsForGroupType(groupTypeId);
-
-            for (GroupId groupId : groupsForGroupType) {
-                System.out.println("GroupType: " + groupTypeId + ", GroupId: " + groupId + " has this many people: " + groupsDataManager.getPersonCountForGroup(groupId));
-            }
-            
-        }
-        // End unnecessary section
-
-        if (!merged) {
-            tribeVoting();
-        } else {
+        if (merged) {
             individualVoting();
+        } else {
+            identifySusceptibleTribes();
         }
 
         if (gameOver) {
-            System.out.println("Voting manager hit game over!!");
             return;
         }
-
-        double planTime = actorContext.getTime() + 2;
-        System.out.println("-----------------planning the next vote for time: " + planTime);
-        actorContext.addPlan(((c) -> voteOffPlayer()), planTime);
-
+    
+        actorContext.addPlan(((c) -> voteOffPlayer()), actorContext.getTime() + 2);
     }
 
-    private void tribeVoting() {
+    private void identifySusceptibleTribes() {
 
         List<GroupId> tribeGroupIds = groupsDataManager.getGroupsForGroupType(GroupType.TRIBE);
 
-        for (GroupId groupId : tribeGroupIds) {
+        for (GroupId tribeGroupId : tribeGroupIds) {
+            Boolean isTribeImmune = groupsDataManager.getGroupPropertyValue(tribeGroupId, GroupProperty.IS_IMMUNE);
 
-            Boolean isGroupImmune = groupsDataManager.getGroupPropertyValue(groupId, GroupProperty.IS_IMMUNE);
-
-            if (!isGroupImmune) {
-                actuallyVoteOffPlayer(groupId);
+            if (!isTribeImmune) {
+                tribalVoting(tribeGroupId);
             }
-
         }
     }
 
-    private void actuallyVoteOffPlayer(GroupId groupId) {
+    private void tribalVoting(GroupId tribeGroupId) {
 
-        List<PersonId> peopleForGroup = groupsDataManager.getPeopleForGroup(groupId);
+        List<PersonId> playerIdsInTribe = groupsDataManager.getPeopleForGroup(tribeGroupId);
 
-        boolean shouldMergeAfterVote = peopleForGroup.size() <= 4;
+        /*
+         * If the tribe currently has 4 players and we vote 1 out now, then 3 players will remain.
+         * We cannot risk the tribe losing another member next round (2 is too few for a tribe to compete), so we must merge the tribes
+         */
+        boolean shouldMergeAfterVote = playerIdsInTribe.size() <= 4;
 
-        Random random = new Random(randomGenerator.nextLong());
-        Collections.shuffle(peopleForGroup, random);
-
-        PersonId personId = peopleForGroup.get(0);
-
-        groupsDataManager.removePersonFromGroup(personId, groupId);
+        // Select 1 player to vote off
+        int indexOfPlayerVotedOff = randomGenerator.nextInt(playerIdsInTribe.size());
+        PersonId playerIdVotedOff = playerIdsInTribe.get(indexOfPlayerVotedOff);
 
         GroupId newGroupId = groupsDataManager.getGroupsForGroupType(GroupType.SENT_HOME).get(0);
+        transferPlayerToNewGroup(playerIdVotedOff, tribeGroupId, newGroupId);
 
-        groupsDataManager.addPersonToGroup(personId, newGroupId);
+        actorContext.releaseOutput("Player " + playerIdVotedOff + " from tribe " + tribeGroupId + " was voted off!");
+
+        // Report the status of each group after the vote:
+        Set<GroupTypeId> groupTypeIds = groupsDataManager.getGroupTypeIds();
+
+        for (GroupTypeId groupTypeId : groupTypeIds) {
+            List<GroupId> groupsForGroupType = groupsDataManager.getGroupsForGroupType(groupTypeId);
+            for (GroupId groupId : groupsForGroupType) {
+                actorContext.releaseOutput("GroupType: " + groupTypeId + ", GroupId: " + groupId + " has this many people: " + groupsDataManager.getPersonCountForGroup(groupId));
+            }
+        }
 
         if (shouldMergeAfterVote) {
+            actorContext.releaseOutput("---------------------------The tribes have merged!---------------------------");
             globalPropertiesDataManager.setGlobalPropertyValue(GlobalProperty.MERGED, true);
             merged = true;
             mergeTribes();
         }
- 
+
     }
 
     private void mergeTribes() {
      
         List<GroupId> tribeGroupIds = groupsDataManager.getGroupsForGroupType(GroupType.TRIBE);
+        GroupId newGroupId = groupsDataManager.getGroupsForGroupType(GroupType.MERGED_TRIBE).get(0);
 
-        for (GroupId groupId : tribeGroupIds) {
-
-            List<PersonId> peopleForGroup = groupsDataManager.getPeopleForGroup(groupId);
-
-            for (PersonId personId : peopleForGroup) {
-
-                groupsDataManager.removePersonFromGroup(personId, groupId);
-
-                GroupId newGroupId = groupsDataManager.getGroupsForGroupType(GroupType.MERGED_TRIBE).get(0);
-
-                groupsDataManager.addPersonToGroup(personId, newGroupId);
-
+        for (GroupId tribeGroupId : tribeGroupIds) {
+            List<PersonId> playerIdsInTribe = groupsDataManager.getPeopleForGroup(tribeGroupId);
+            for (PersonId playerId : playerIdsInTribe) {
+                transferPlayerToNewGroup(playerId, tribeGroupId, newGroupId);
             }
-
         }
-
     }
 
     private void individualVoting() {
 
-        GroupId groupId = groupsDataManager.getGroupsForGroupType(GroupType.MERGED_TRIBE).get(0);
-        List<PersonId> peopleForGroup = groupsDataManager.getPeopleForGroup(groupId);
-        gameOver = peopleForGroup.size() <= 2;
+        GroupId mergedTribeGroupId = groupsDataManager.getGroupsForGroupType(GroupType.MERGED_TRIBE).get(0);
+        List<PersonId> playerIdsInMergedTribe = groupsDataManager.getPeopleForGroup(mergedTribeGroupId);
 
-        List<PersonId> peopleNotSafe = new ArrayList<>();
+        // If we have 2 players remaining, then this is the last vote and the game should end
+        gameOver = playerIdsInMergedTribe.size() <= 2;
 
-        for (PersonId personId : peopleForGroup) {
+        List<PersonId> playersNotSafe = new ArrayList<>();
 
-            boolean isImmune = personPropertiesDataManager.getPersonPropertyValue(personId, PersonProperty.IS_IMMUNE);
-            System.out.println("person " + personId + " is immune? " + isImmune);
+        for (PersonId playerId : playerIdsInMergedTribe) {
+            boolean isImmune = personPropertiesDataManager.getPersonPropertyValue(playerId, PersonProperty.IS_IMMUNE);
+            actorContext.releaseOutput("Player " + playerId + " is immune? " + isImmune);
 
             if (!isImmune) {
-                peopleNotSafe.add(personId); 
+                playersNotSafe.add(playerId); 
             }
-
         }
 
-        System.out.println("peopleNotSafe has this many members: " + peopleNotSafe.size());
+        actorContext.releaseOutput("playersNotSafe has this many members: " + playersNotSafe.size());
 
-        Random random = new Random(randomGenerator.nextLong());
-        Collections.shuffle(peopleNotSafe, random);
+        // Select 1 player to vote off
+        int indexOfPlayerVotedOff = randomGenerator.nextInt(playersNotSafe.size());
+        PersonId playerIdVotedOff = playersNotSafe.get(indexOfPlayerVotedOff);
+        actorContext.releaseOutput("Oh No! Player " + playerIdVotedOff + " was voted off!!");
 
-        PersonId personVotedOff = peopleNotSafe.get(0);
-        System.out.println("Oh No! Person " + personVotedOff + " was voted off!!");
-
-        groupsDataManager.removePersonFromGroup(personVotedOff, groupId);
-
+        // Move the voted off player from the merged tribe to the jury
         GroupId newGroupId = groupsDataManager.getGroupsForGroupType(GroupType.JURY).get(0);
+        transferPlayerToNewGroup(playerIdVotedOff, mergedTribeGroupId, newGroupId);
 
-        groupsDataManager.addPersonToGroup(personVotedOff, newGroupId);
+        // Report the status of the merged tribe and jury after the vote:
+        int numberOfPlayersInMergedTribe = groupsDataManager.getPeopleForGroup(mergedTribeGroupId).size();
+        int numberOfPlayersInJury = groupsDataManager.getPeopleForGroup(newGroupId).size();
+        actorContext.releaseOutput("Merged tribe has this many members: " + numberOfPlayersInMergedTribe);
+        actorContext.releaseOutput("Jury has this many members: " + numberOfPlayersInJury);
 
+    }
+
+    private void transferPlayerToNewGroup(PersonId playerId, GroupId oldGroupId, GroupId newGroupId) {
+        groupsDataManager.removePersonFromGroup(playerId, oldGroupId);
+        groupsDataManager.addPersonToGroup(playerId, newGroupId);
     }
 
 }

@@ -1,8 +1,6 @@
 package com.survivorsim.plugins.model.actors;
 
-import java.util.Collections;
 import java.util.List;
-import java.util.Random;
 
 import org.apache.commons.math3.random.RandomGenerator;
 
@@ -53,7 +51,7 @@ public class ImmunityManager {
     }
 
     public void awardImmunity() {
-
+        System.out.println();
         actorContext.releaseOutput("The immunity challenge is beginning!");
 
         if (!merged) {
