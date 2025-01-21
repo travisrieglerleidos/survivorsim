@@ -1,12 +1,17 @@
 package com.survivorsim;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+
 import org.apache.commons.math3.random.RandomGenerator;
 
 import com.survivorsim.plugins.model.ModelPlugin;
-import com.survivorsim.plugins.model.reports.OutputConsumer;
 import com.survivorsim.plugins.model.support.GlobalProperty;
 import com.survivorsim.plugins.model.support.GroupProperty;
 import com.survivorsim.plugins.model.support.GroupType;
+import com.survivorsim.plugins.model.support.ModelReportLabel;
 import com.survivorsim.plugins.model.support.PersonProperty;
 import com.survivorsim.plugins.model.support.Region;
 
@@ -16,6 +21,7 @@ import gov.hhs.aspr.ms.gcm.simulation.plugins.globalproperties.GlobalPropertiesP
 import gov.hhs.aspr.ms.gcm.simulation.plugins.globalproperties.datamanagers.GlobalPropertiesPluginData;
 import gov.hhs.aspr.ms.gcm.simulation.plugins.groups.GroupsPlugin;
 import gov.hhs.aspr.ms.gcm.simulation.plugins.groups.datamanagers.GroupsPluginData;
+import gov.hhs.aspr.ms.gcm.simulation.plugins.groups.reports.GroupPopulationReportPluginData;
 import gov.hhs.aspr.ms.gcm.simulation.plugins.people.PeoplePlugin;
 import gov.hhs.aspr.ms.gcm.simulation.plugins.people.datamanagers.PeoplePluginData;
 import gov.hhs.aspr.ms.gcm.simulation.plugins.personproperties.PersonPropertiesPlugin;
@@ -23,6 +29,8 @@ import gov.hhs.aspr.ms.gcm.simulation.plugins.personproperties.datamanagers.Pers
 import gov.hhs.aspr.ms.gcm.simulation.plugins.properties.support.PropertyDefinition;
 import gov.hhs.aspr.ms.gcm.simulation.plugins.regions.RegionsPlugin;
 import gov.hhs.aspr.ms.gcm.simulation.plugins.regions.datamanagers.RegionsPluginData;
+import gov.hhs.aspr.ms.gcm.simulation.plugins.reports.support.NIOReportItemHandler;
+import gov.hhs.aspr.ms.gcm.simulation.plugins.reports.support.ReportPeriod;
 import gov.hhs.aspr.ms.gcm.simulation.plugins.stochastics.StochasticsPlugin;
 import gov.hhs.aspr.ms.gcm.simulation.plugins.stochastics.datamanagers.StochasticsPluginData;
 import gov.hhs.aspr.ms.gcm.simulation.plugins.stochastics.support.WellState;
@@ -30,7 +38,20 @@ import gov.hhs.aspr.ms.util.random.RandomGeneratorProvider;
 
 public class Main {
 
+    private final Path outputDirectory;
+
+    private Main(Path outputDirectory) {
+        this.outputDirectory = outputDirectory;
+    }
+
     private RandomGenerator randomGenerator = RandomGeneratorProvider.getRandomGenerator(9032703880551658180L);
+
+    private NIOReportItemHandler getNIOReportItemHandler() {
+        return NIOReportItemHandler.builder()//
+            .addReport(ModelReportLabel.GROUP_POPULATION, outputDirectory.resolve("group_population_report.csv"))//
+            .addReport(ModelReportLabel.PLAYER_ENDGAME, outputDirectory.resolve("player_endgame_report.csv"))//
+            .build();
+    }
 
     private Plugin getGlobalPropertiesPlugin() {
 
@@ -111,9 +132,15 @@ public class Main {
         builder.defineGroupProperty(GroupType.TRIBE, GroupProperty.IS_IMMUNE, propertyDefinition);
 
         GroupsPluginData groupsPluginData = builder.build();
+
+        GroupPopulationReportPluginData groupPopulationReportPluginData = GroupPopulationReportPluginData.builder()//
+			.setReportLabel(ModelReportLabel.GROUP_POPULATION)//
+			.setReportPeriod(ReportPeriod.DAILY)//
+			.build();//
         
         return GroupsPlugin.builder()//
             .setGroupsPluginData(groupsPluginData)//
+            .setGroupPopulationReportPluginData(groupPopulationReportPluginData)//
             .getGroupsPlugin();
 
     }
@@ -166,12 +193,24 @@ public class Main {
             .addPlugin(getPeoplePlugin())//
             .addPlugin(getPersonPropertiesPlugin())//
             .addPlugin(ModelPlugin.getModePlugin())//
-            .addExperimentContextConsumer(new OutputConsumer())//
+            .addExperimentContextConsumer(getNIOReportItemHandler())//
             .build()//
             .execute();
     }
 
-    public static void main(String[] args) {
-        new Main().execute();
+    public static void main(String[] args) throws IOException{
+        if (args.length == 0) {
+            throw new RuntimeException("One output directory argument is required");
+        }
+        Path outputDirectory = Paths.get(args[0]);
+        if (!Files.exists(outputDirectory)) {
+            Files.createDirectory(outputDirectory);
+        } else {
+            if (!Files.isDirectory(outputDirectory)) {
+                throw new IOException("Provided path is not a directory");
+            }
+        }
+
+        new Main(outputDirectory).execute();
     }
 }
