@@ -4,8 +4,10 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-
-import org.apache.commons.math3.random.RandomGenerator;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Random;
+import java.util.stream.IntStream;
 
 import com.survivorsim.plugins.model.ModelPlugin;
 import com.survivorsim.plugins.model.support.GlobalProperty;
@@ -15,7 +17,9 @@ import com.survivorsim.plugins.model.support.ModelReportLabel;
 import com.survivorsim.plugins.model.support.PersonProperty;
 import com.survivorsim.plugins.model.support.Region;
 
+import gov.hhs.aspr.ms.gcm.simulation.nucleus.Dimension;
 import gov.hhs.aspr.ms.gcm.simulation.nucleus.Experiment;
+import gov.hhs.aspr.ms.gcm.simulation.nucleus.FunctionalDimension;
 import gov.hhs.aspr.ms.gcm.simulation.nucleus.Plugin;
 import gov.hhs.aspr.ms.gcm.simulation.plugins.globalproperties.GlobalPropertiesPlugin;
 import gov.hhs.aspr.ms.gcm.simulation.plugins.globalproperties.datamanagers.GlobalPropertiesPluginData;
@@ -34,7 +38,6 @@ import gov.hhs.aspr.ms.gcm.simulation.plugins.reports.support.ReportPeriod;
 import gov.hhs.aspr.ms.gcm.simulation.plugins.stochastics.StochasticsPlugin;
 import gov.hhs.aspr.ms.gcm.simulation.plugins.stochastics.datamanagers.StochasticsPluginData;
 import gov.hhs.aspr.ms.gcm.simulation.plugins.stochastics.support.WellState;
-import gov.hhs.aspr.ms.util.random.RandomGeneratorProvider;
 
 public class Main {
 
@@ -43,8 +46,6 @@ public class Main {
     private Main(Path outputDirectory) {
         this.outputDirectory = outputDirectory;
     }
-
-    private RandomGenerator randomGenerator = RandomGeneratorProvider.getRandomGenerator(9032703880551658180L);
 
     private NIOReportItemHandler getNIOReportItemHandler() {
         return NIOReportItemHandler.builder()//
@@ -96,12 +97,44 @@ public class Main {
     }
 
     private Plugin getStochasticsPlugin() {
-        WellState wellState = WellState.builder().setSeed(randomGenerator.nextLong()).build();
+        WellState wellState = WellState.builder().setSeed(0).build();
 		StochasticsPluginData stochasticsPluginData = StochasticsPluginData.builder()//
 			.setMainRNGState(wellState)//
 			.build();
 
 		return StochasticsPlugin.getStochasticsPlugin(stochasticsPluginData);
+    }
+
+    private Dimension getStochasticsDimension(long seed) {
+        FunctionalDimension.Builder builder = FunctionalDimension.builder();
+
+        Random random = new Random(seed);
+
+        List<Long> seedValues = new ArrayList<>();
+        for (int i = 0; i < 10; i++) {
+            seedValues.add(random.nextLong());
+        }
+
+        IntStream.range(0, seedValues.size()).forEach((i) -> {
+            builder.addLevel((context) -> {
+                StochasticsPluginData.Builder stochasticsPluginDataBuilder = context.getPluginDataBuilder(StochasticsPluginData.Builder.class);
+                long seedValue = seedValues.get(i);
+                WellState wellState = WellState.builder().setSeed(seedValue).build();
+                stochasticsPluginDataBuilder.setMainRNGState(wellState);
+
+                ArrayList<String> result = new ArrayList<>();
+                result.add(Integer.toString(i));
+                result.add(Long.toString(seedValue) + "L");
+
+                return result;
+            });
+        });
+
+        builder.addMetaDatum("seed index");
+        builder.addMetaDatum("seed value");
+
+        return builder.build();
+
     }
 
     private Plugin getRegionsPlugin() {
@@ -185,6 +218,9 @@ public class Main {
     }
 
     private void execute() {
+
+        Dimension stochasticsDimension = getStochasticsDimension(539847398756272L);
+
         Experiment.builder()//
             .addPlugin(getGlobalPropertiesPlugin())//
             .addPlugin(getStochasticsPlugin())//
@@ -193,6 +229,7 @@ public class Main {
             .addPlugin(getPeoplePlugin())//
             .addPlugin(getPersonPropertiesPlugin())//
             .addPlugin(ModelPlugin.getModePlugin())//
+            .addDimension(stochasticsDimension)//
             .addExperimentContextConsumer(getNIOReportItemHandler())//
             .build()//
             .execute();
